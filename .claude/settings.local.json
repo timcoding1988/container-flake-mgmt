@@ -25,7 +25,8 @@
       "Bash(gh run list:*)",
       "Bash(gh workflow run:*)",
       "Bash(gh run watch:*)",
-      "Bash(go run:*)"
+      "Bash(go run:*)",
+      "Bash(gh api:*)"
     ]
   }
 }
