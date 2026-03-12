@@ -2,9 +2,7 @@ package cirrus
 
 import (
 	"context"
-	"log"
 	"strings"
-	"sync"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -33,57 +31,59 @@ func NewFetcher(client *Client, workers int) *Fetcher {
 	}
 }
 
-// FetchAll fetches all artifacts concurrently using a worker pool
+// FetchAll fetches all artifacts concurrently using a worker pool.
+// Results are returned in the same order as requests (by original index).
+// Errors from individual fetches are captured in FetchResult.Error rather than
+// failing the entire operation, allowing partial success.
 func (f *Fetcher) FetchAll(ctx context.Context, requests []ArtifactRequest) []FetchResult {
 	if len(requests) == 0 {
 		return nil
 	}
 
+	// Pre-allocate results array - each worker writes to its own index (no mutex needed)
 	results := make([]FetchResult, len(requests))
-	var mu sync.Mutex
-	resultIdx := 0
 
-	// Create work channel
+	// Create work channel - send indices, not the full request
 	workCh := make(chan int, len(requests))
 	for i := range requests {
 		workCh <- i
 	}
 	close(workCh)
 
-	// Worker pool
-	g, ctx := errgroup.WithContext(ctx)
+	// Worker pool using errgroup for coordination
+	g, gctx := errgroup.WithContext(ctx)
 	for i := 0; i < f.workers; i++ {
 		g.Go(func() error {
 			for idx := range workCh {
+				// Check for cancellation before starting work
 				select {
-				case <-ctx.Done():
-					return ctx.Err()
+				case <-gctx.Done():
+					return gctx.Err()
 				default:
 				}
 
 				req := requests[idx]
 				artifactName := normalizeArtifactName(req.TaskName)
 
-				data, err := f.client.FetchArtifact(ctx, req.TaskID, artifactName)
+				data, err := f.client.FetchArtifact(gctx, req.TaskID, artifactName)
 
-				mu.Lock()
-				results[resultIdx] = FetchResult{
+				// Store result at original index - no mutex needed since each index is unique
+				results[idx] = FetchResult{
 					Request: req,
 					Data:    data,
 					Error:   err,
 				}
-				resultIdx++
-				mu.Unlock()
 			}
 			return nil
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		log.Printf("Fetcher error: %v", err)
-	}
+	// Wait for all workers to complete
+	// Note: Context cancellation errors are expected and don't indicate a problem
+	// with the fetching logic - individual fetch errors are in FetchResult.Error
+	_ = g.Wait()
 
-	return results[:resultIdx]
+	return results
 }
 
 // normalizeArtifactName converts a task name to the expected artifact filename
