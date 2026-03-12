@@ -17,7 +17,14 @@
       "Bash(./flake-detect:*)",
       "WebFetch(domain:api.cirrus-ci.com)",
       "WebFetch(domain:github.com)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(gh repo create:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh run view:*)",
+      "Bash(git push:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh workflow run:*)",
+      "Bash(gh run watch:*)"
     ]
   }
 }

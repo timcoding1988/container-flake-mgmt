@@ -9,7 +9,7 @@ on:
       days:
         description: 'Number of days to analyze'
         required: false
-        default: '30'
+        default: '7'
 
 permissions:
   contents: read
@@ -37,12 +37,13 @@ jobs:
         run: go build -o flake-detect ./cmd/flake-detect
 
       - name: Run Analysis
+        timeout-minutes: 30
         env:
           CIRRUS_API_TOKEN: ${{ secrets.CIRRUS_API_TOKEN }}
         run: |
           ./flake-detect \
             --repo containers/podman \
-            --days ${{ github.event.inputs.days || '30' }} \
+            --days ${{ github.event.inputs.days || '7' }} \
             --output docs/ \
             --workers 10 \
             --verbose

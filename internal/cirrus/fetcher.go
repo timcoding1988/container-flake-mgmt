@@ -2,7 +2,10 @@ package cirrus
 
 import (
 	"context"
+	"log"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -40,15 +43,34 @@ func (f *Fetcher) FetchAll(ctx context.Context, requests []ArtifactRequest) []Fe
 		return nil
 	}
 
+	total := len(requests)
+	var completed int64
+
 	// Pre-allocate results array - each worker writes to its own index (no mutex needed)
-	results := make([]FetchResult, len(requests))
+	results := make([]FetchResult, total)
 
 	// Create work channel - send indices, not the full request
-	workCh := make(chan int, len(requests))
+	workCh := make(chan int, total)
 	for i := range requests {
 		workCh <- i
 	}
 	close(workCh)
+
+	// Progress logger goroutine
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				c := atomic.LoadInt64(&completed)
+				log.Printf("Progress: %d/%d artifacts fetched (%.1f%%)", c, total, float64(c)/float64(total)*100)
+			case <-done:
+				return
+			}
+		}
+	}()
 
 	// Worker pool using errgroup for coordination
 	g, gctx := errgroup.WithContext(ctx)
@@ -73,6 +95,8 @@ func (f *Fetcher) FetchAll(ctx context.Context, requests []ArtifactRequest) []Fe
 					Data:    data,
 					Error:   err,
 				}
+
+				atomic.AddInt64(&completed, 1)
 			}
 			return nil
 		})
@@ -82,6 +106,9 @@ func (f *Fetcher) FetchAll(ctx context.Context, requests []ArtifactRequest) []Fe
 	// Note: Context cancellation errors are expected and don't indicate a problem
 	// with the fetching logic - individual fetch errors are in FetchResult.Error
 	_ = g.Wait()
+
+	close(done)
+	log.Printf("Fetch complete: %d/%d artifacts", atomic.LoadInt64(&completed), total)
 
 	return results
 }
