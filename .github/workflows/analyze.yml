@@ -9,7 +9,7 @@ on:
       days:
         description: 'Number of days to analyze'
         required: false
-        default: '7'
+        default: '3'
 
 permissions:
   contents: read
@@ -43,7 +43,7 @@ jobs:
         run: |
           ./flake-detect \
             --repo containers/podman \
-            --days ${{ github.event.inputs.days || '7' }} \
+            --days ${{ github.event.inputs.days || '3' }} \
             --output docs/ \
             --workers 5 \
             --verbose
