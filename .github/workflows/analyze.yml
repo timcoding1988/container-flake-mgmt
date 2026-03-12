@@ -45,7 +45,7 @@ jobs:
             --repo containers/podman \
             --days ${{ github.event.inputs.days || '7' }} \
             --output docs/ \
-            --workers 10 \
+            --workers 5 \
             --verbose
 
       - name: Upload JSON artifact (for debugging)
