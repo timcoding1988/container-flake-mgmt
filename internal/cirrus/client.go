@@ -13,8 +13,8 @@ import (
 
 const (
 	DefaultAPIURL     = "https://api.cirrus-ci.com/graphql"
-	// Artifact URL format: html_artifacts is the artifact name in podman's .cirrus.yml
-	ArtifactURLFormat = "https://api.cirrus-ci.com/v1/artifact/task/%s/html_artifacts/%s"
+	// Artifact URL format: "html" is the artifact name in podman's .cirrus.yml
+	ArtifactURLFormat = "https://api.cirrus-ci.com/v1/artifact/task/%s/html/%s"
 )
 
 // Client is a GraphQL client for the Cirrus CI API
@@ -103,11 +103,12 @@ func (c *Client) graphQLRequest(ctx context.Context, query string, variables map
 }
 
 // FetchBuilds fetches builds for a repository within the given time window
+// Uses ownerRepository API with platform, owner, and name parameters
 func (c *Client) FetchBuilds(ctx context.Context, owner, repo, branch string, window time.Duration) ([]Build, error) {
 	query := `
-		query($owner: String!, $repo: String!, $branch: String!, $cursor: String) {
-			repository(owner: $owner, name: $repo) {
-				builds(branch: $branch, first: 100, after: $cursor) {
+		query($platform: String!, $owner: String!, $name: String!, $branch: String, $last: Int, $cursor: String) {
+			ownerRepository(platform: $platform, owner: $owner, name: $name) {
+				builds(branch: $branch, last: $last, before: $cursor) {
 					edges {
 						node {
 							id
@@ -118,8 +119,8 @@ func (c *Client) FetchBuilds(ctx context.Context, owner, repo, branch string, wi
 						}
 					}
 					pageInfo {
-						hasNextPage
-						endCursor
+						hasPreviousPage
+						startCursor
 					}
 				}
 			}
@@ -131,10 +132,12 @@ func (c *Client) FetchBuilds(ctx context.Context, owner, repo, branch string, wi
 
 	for {
 		variables := map[string]interface{}{
-			"owner":  owner,
-			"repo":   repo,
-			"branch": branch,
-			"cursor": cursor,
+			"platform": "github",
+			"owner":    owner,
+			"name":     repo,
+			"branch":   branch,
+			"last":     100,
+			"cursor":   cursor,
 		}
 
 		data, err := c.graphQLRequest(ctx, query, variables)
@@ -143,36 +146,39 @@ func (c *Client) FetchBuilds(ctx context.Context, owner, repo, branch string, wi
 		}
 
 		var response struct {
-			Repository struct {
+			OwnerRepository struct {
 				Builds struct {
 					Edges []struct {
 						Node Build `json:"node"`
 					} `json:"edges"`
 					PageInfo struct {
-						HasNextPage bool    `json:"hasNextPage"`
-						EndCursor   *string `json:"endCursor"`
+						HasPreviousPage bool    `json:"hasPreviousPage"`
+						StartCursor     *string `json:"startCursor"`
 					} `json:"pageInfo"`
 				} `json:"builds"`
-			} `json:"repository"`
+			} `json:"ownerRepository"`
 		}
 
 		if err := json.Unmarshal(data, &response); err != nil {
 			return nil, fmt.Errorf("unmarshal builds: %w", err)
 		}
 
-		for _, edge := range response.Repository.Builds.Edges {
+		foundOldBuild := false
+		for _, edge := range response.OwnerRepository.Builds.Edges {
 			build := edge.Node
 			if !build.IsRecent(window) {
-				// Builds are ordered by time, so we can stop here
-				return allBuilds, nil
+				// Found a build outside our window, stop paginating
+				foundOldBuild = true
+				continue
 			}
 			allBuilds = append(allBuilds, build)
 		}
 
-		if !response.Repository.Builds.PageInfo.HasNextPage {
+		// Stop if we found old builds or no more pages
+		if foundOldBuild || !response.OwnerRepository.Builds.PageInfo.HasPreviousPage {
 			break
 		}
-		cursor = response.Repository.Builds.PageInfo.EndCursor
+		cursor = response.OwnerRepository.Builds.PageInfo.StartCursor
 	}
 
 	return allBuilds, nil

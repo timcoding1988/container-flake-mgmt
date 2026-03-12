@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "WebFetch(domain:cirrus-ci.org)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(go mod init:*)",
+      "Bash(go get:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(go test:*)",
+      "Bash(go build:*)",
+      "Bash(./flake-detect:*)",
+      "WebFetch(domain:api.cirrus-ci.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl:*)"
+    ]
+  }
+}

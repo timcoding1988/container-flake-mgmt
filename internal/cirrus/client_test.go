@@ -16,9 +16,10 @@ func TestClientFetchBuilds(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		// Updated to match ownerRepository response structure
 		response := fmt.Sprintf(`{
 			"data": {
-				"repository": {
+				"ownerRepository": {
 					"builds": {
 						"edges": [
 							{
@@ -32,8 +33,8 @@ func TestClientFetchBuilds(t *testing.T) {
 							}
 						],
 						"pageInfo": {
-							"hasNextPage": false,
-							"endCursor": null
+							"hasPreviousPage": false,
+							"startCursor": null
 						}
 					}
 				}

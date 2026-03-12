@@ -87,10 +87,9 @@ func (f *Fetcher) FetchAll(ctx context.Context, requests []ArtifactRequest) []Fe
 }
 
 // normalizeArtifactName converts a task name to the expected artifact filename
-// Task: "sys fedora rootless" -> Artifact: "sys_fedora_rootless.log.html"
+// Task: "sys podman fedora-43 root host" -> Artifact: "sys-podman-fedora-43-root-host.log.html"
 func normalizeArtifactName(taskName string) string {
-	// Replace spaces and special characters with underscores
-	name := strings.ReplaceAll(taskName, " ", "_")
-	name = strings.ReplaceAll(name, "-", "_")
+	// Replace spaces with hyphens (artifact filenames use hyphens)
+	name := strings.ReplaceAll(taskName, " ", "-")
 	return name + ".log.html"
 }
