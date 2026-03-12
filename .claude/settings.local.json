@@ -24,7 +24,8 @@
       "Bash(git push:*)",
       "Bash(gh run list:*)",
       "Bash(gh workflow run:*)",
-      "Bash(gh run watch:*)"
+      "Bash(gh run watch:*)",
+      "Bash(go run:*)"
     ]
   }
 }
