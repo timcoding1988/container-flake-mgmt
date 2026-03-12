@@ -150,14 +150,39 @@ func main() {
 	}
 	log.Printf("Wrote JSON report to %s", jsonPath)
 
-	// Write HTML report
+	// Write HTML report (only include non-stable tests to avoid huge HTML)
+	htmlReport := filterForHTML(report)
 	htmlPath := filepath.Join(*output, "index.html")
-	if err := reporter.WriteHTML(report, htmlPath); err != nil {
+	if err := reporter.WriteHTML(htmlReport, htmlPath); err != nil {
 		log.Fatalf("Failed to write HTML: %v", err)
 	}
-	log.Printf("Wrote HTML report to %s", htmlPath)
+	log.Printf("Wrote HTML report to %s (%d tests displayed)", htmlPath, len(htmlReport.Tests))
 
 	printSummary(report)
+}
+
+// filterForHTML creates a copy of the report with only non-stable tests
+// to avoid generating huge HTML files with 100K+ test rows
+func filterForHTML(report *analyzer.Report) *analyzer.Report {
+	filtered := &analyzer.Report{
+		GeneratedAt: report.GeneratedAt,
+		Repository:  report.Repository,
+		Branch:      report.Branch,
+		WindowDays:  report.WindowDays,
+		TotalBuilds: report.TotalBuilds,
+		TotalTests:  report.TotalTests,
+		FlakyCount:  report.FlakyCount,
+		Tests:       make([]analyzer.TestStats, 0),
+	}
+
+	for _, t := range report.Tests {
+		// Include any test that has failures (flaky, broken, etc.)
+		if t.FailCount > 0 {
+			filtered.Tests = append(filtered.Tests, t)
+		}
+	}
+
+	return filtered
 }
 
 func printSummary(report *analyzer.Report) {
