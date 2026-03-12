@@ -9,14 +9,16 @@ on:
       days:
         description: 'Number of days to analyze'
         required: false
-        default: '7'
+        default: '3'
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
-# Only one analysis at a time
+# Only one deployment at a time
 concurrency:
-  group: analyze
+  group: pages
   cancel-in-progress: false
 
 jobs:
@@ -41,21 +43,33 @@ jobs:
         run: |
           ./flake-detect \
             --repo containers/podman \
-            --days ${{ github.event.inputs.days || '7' }} \
+            --days ${{ github.event.inputs.days || '3' }} \
             --output docs/ \
             --workers 5 \
             --verbose
 
-      - name: Upload JSON data
+      - name: Upload JSON artifact
         uses: actions/upload-artifact@v4
         with:
           name: flakiness-data
           path: data/results/
           retention-days: 30
 
-      - name: Upload HTML report
-        uses: actions/upload-artifact@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: flakiness-report
           path: docs/
-          retention-days: 30
+
+  deploy:
+    needs: analyze
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
