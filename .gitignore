@@ -1,0 +1,14 @@
+# Binary
+flake-detect
+
+# Generated output (not tracked - generated fresh each run)
+docs/
+data/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
