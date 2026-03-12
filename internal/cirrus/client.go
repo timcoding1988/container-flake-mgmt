@@ -76,7 +76,12 @@ func (c *Client) graphQLRequest(ctx context.Context, query string, variables map
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API error: %s", string(respBody))
+		// Truncate error response to prevent log spam
+		errMsg := string(respBody)
+		if len(errMsg) > 500 {
+			errMsg = errMsg[:500] + "..."
+		}
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, errMsg)
 	}
 
 	var result struct {
@@ -248,8 +253,14 @@ func (c *Client) FetchArtifact(ctx context.Context, taskID, filename string) ([]
 			continue
 		}
 
-		body, err := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
 		resp.Body.Close()
+
+		// Check read error first
+		if readErr != nil {
+			lastErr = fmt.Errorf("read body: %w", readErr)
+			continue
+		}
 
 		if resp.StatusCode == http.StatusTooManyRequests {
 			lastErr = fmt.Errorf("rate limited (429)")
@@ -262,11 +273,6 @@ func (c *Client) FetchArtifact(ctx context.Context, taskID, filename string) ([]
 
 		if resp.StatusCode != http.StatusOK {
 			lastErr = fmt.Errorf("artifact fetch error: status %d", resp.StatusCode)
-			continue
-		}
-
-		if err != nil {
-			lastErr = fmt.Errorf("read body: %w", err)
 			continue
 		}
 
